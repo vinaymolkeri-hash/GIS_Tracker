@@ -5,18 +5,274 @@
       "type": "Feature",
       "properties": {
         "name": "Lake Vembanad",
-        "type": "lake",
-        "country": "India"
+        "type": "lake"
       },
       "geometry": {
         "type": "Polygon",
         "coordinates": [
           [
-            [76.1, 9.8],
-            [76.3, 9.8],
-            [76.3, 9.9],
-            [76.1, 9.9],
-            [76.1, 9.8]
+            [
+              76.17,
+              9.52
+            ],
+            [
+              76.55,
+              9.52
+            ],
+            [
+              76.55,
+              9.98
+            ],
+            [
+              76.17,
+              9.98
+            ],
+            [
+              76.17,
+              9.52
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ashtamudi Lake",
+        "type": "lake"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              76.55,
+              8.85
+            ],
+            [
+              76.75,
+              8.85
+            ],
+            [
+              76.75,
+              9.05
+            ],
+            [
+              76.55,
+              9.05
+            ],
+            [
+              76.55,
+              8.85
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Periyar River, Kerala",
+        "type": "river"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            76.26,
+            10.19
+          ],
+          [
+            76.21,
+            10.22
+          ],
+          [
+            76.15,
+            10.23
+          ],
+          [
+            76.09,
+            10.24
+          ],
+          [
+            76.02,
+            10.24
+          ],
+          [
+            75.97,
+            10.21
+          ],
+          [
+            75.93,
+            10.18
+          ],
+          [
+            75.88,
+            10.14
+          ],
+          [
+            75.83,
+            10.1
+          ],
+          [
+            75.79,
+            10.08
+          ],
+          [
+            75.76,
+            10.07
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Chaliyar River, Kerala",
+        "type": "river"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            76.14,
+            11.25
+          ],
+          [
+            76.05,
+            11.22
+          ],
+          [
+            75.99,
+            11.2
+          ],
+          [
+            75.93,
+            11.17
+          ],
+          [
+            75.87,
+            11.15
+          ],
+          [
+            75.81,
+            11.14
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Bharathapuzha River",
+        "type": "river"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            76.65,
+            10.79
+          ],
+          [
+            76.55,
+            10.79
+          ],
+          [
+            76.42,
+            10.79
+          ],
+          [
+            76.3,
+            10.79
+          ],
+          [
+            76.18,
+            10.78
+          ],
+          [
+            76.1,
+            10.77
+          ],
+          [
+            76.02,
+            10.76
+          ],
+          [
+            75.9,
+            10.77
+          ],
+          [
+            75.82,
+            10.78
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Kabini Reservoir",
+        "type": "reservoir"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              76.31,
+              11.74
+            ],
+            [
+              76.45,
+              11.74
+            ],
+            [
+              76.45,
+              11.82
+            ],
+            [
+              76.31,
+              11.82
+            ],
+            [
+              76.31,
+              11.74
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Krishnagiri Reservoir",
+        "type": "reservoir"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.95,
+              12.47
+            ],
+            [
+              78.12,
+              12.47
+            ],
+            [
+              78.12,
+              12.57
+            ],
+            [
+              77.95,
+              12.57
+            ],
+            [
+              77.95,
+              12.47
+            ]
           ]
         ]
       }
@@ -25,15 +281,199 @@
       "type": "Feature",
       "properties": {
         "name": "River Ganges Segment",
-        "type": "river",
-        "country": "India"
+        "type": "river"
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [88.3, 25.6],
-          [88.4, 25.7],
-          [88.5, 25.8]
+          [
+            88.5,
+            25.8
+          ],
+          [
+            88.3,
+            25.5
+          ],
+          [
+            87.9,
+            25.2
+          ],
+          [
+            87.4,
+            25.1
+          ],
+          [
+            86.9,
+            25.2
+          ],
+          [
+            86.4,
+            25.2
+          ],
+          [
+            85.9,
+            25.5
+          ],
+          [
+            85.4,
+            25.6
+          ],
+          [
+            84.9,
+            25.6
+          ],
+          [
+            84.4,
+            25.5
+          ],
+          [
+            83.9,
+            25.4
+          ],
+          [
+            83.4,
+            25.4
+          ],
+          [
+            82.9,
+            25.5
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Chilika Lake",
+        "type": "lake"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              85.0,
+              19.68
+            ],
+            [
+              85.6,
+              19.68
+            ],
+            [
+              85.6,
+              19.98
+            ],
+            [
+              85.0,
+              19.98
+            ],
+            [
+              85.0,
+              19.68
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Dal Lake",
+        "type": "lake"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              74.81,
+              34.08
+            ],
+            [
+              74.87,
+              34.08
+            ],
+            [
+              74.87,
+              34.14
+            ],
+            [
+              74.81,
+              34.14
+            ],
+            [
+              74.81,
+              34.08
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Hussain Sagar Lake",
+        "type": "lake"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              78.44,
+              17.43
+            ],
+            [
+              78.48,
+              17.43
+            ],
+            [
+              78.48,
+              17.47
+            ],
+            [
+              78.44,
+              17.47
+            ],
+            [
+              78.44,
+              17.43
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Pookode Lake",
+        "type": "lake"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.99,
+              11.54
+            ],
+            [
+              76.02,
+              11.54
+            ],
+            [
+              76.02,
+              11.57
+            ],
+            [
+              75.99,
+              11.57
+            ],
+            [
+              75.99,
+              11.54
+            ]
+          ]
         ]
       }
     }
