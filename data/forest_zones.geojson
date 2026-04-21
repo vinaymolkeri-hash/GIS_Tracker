@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Forest Zone A",
+        "type": "forest"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.15, 9.93],
+            [76.25, 9.93],
+            [76.25, 9.98],
+            [76.15, 9.98],
+            [76.15, 9.93]
+          ]
+        ]
+      }
+    }
+  ]
+}

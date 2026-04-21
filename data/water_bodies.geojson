@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Lake Vembanad",
+        "type": "lake",
+        "country": "India"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.1, 9.8],
+            [76.3, 9.8],
+            [76.3, 9.9],
+            [76.1, 9.9],
+            [76.1, 9.8]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "River Ganges Segment",
+        "type": "river",
+        "country": "India"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [88.3, 25.6],
+          [88.4, 25.7],
+          [88.5, 25.8]
+        ]
+      }
+    }
+  ]
+}
