@@ -163,8 +163,12 @@ out tags;
 """
 
 
-def _run_overpass(query, retries=2):
-    """Execute an Overpass query. Retries on 429/504 rate-limit errors."""
+def _run_overpass(query, retries=1):
+    """
+    Execute an Overpass query with a hard 5-second timeout.
+    Returns elements list or [] on any failure.
+    One retry on rate-limit (429) only.
+    """
     import time as _t
     data = urllib.parse.urlencode({"data": query}).encode()
     req  = urllib.request.Request(
@@ -174,14 +178,14 @@ def _run_overpass(query, retries=2):
     )
     for attempt in range(retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=28) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:  # hard 5s cap
                 return json.loads(resp.read().decode()).get("elements", [])
         except Exception as e:
             code = getattr(e, "code", 0)
             if attempt < retries and code in (429, 503, 504):
-                _t.sleep(6 * (attempt + 1))
+                _t.sleep(3)
                 continue
-            return []
+            return []   # graceful fallback — never crashes app
     return []
 
 
@@ -352,7 +356,7 @@ def api_analyze():
     except (TypeError, ValueError):
         return jsonify({"error": "lat and lon must be numbers"}), 400
 
-    # Layer 1: local GeoJSON
+    # Layer 1: local GeoJSON (always fast — 3-40ms)
     result = analyze_risk(lat, lon)
     result["lat"] = lat
     result["lon"] = lon
@@ -360,16 +364,21 @@ def api_analyze():
         result["resolved_name"] = resolved_name
 
     if result["risk"] == "HIGH":
-        return jsonify(result)
+        return jsonify(result)   # early exit — no need for Overpass
 
-    # Layer 2: fast Nominatim tag check
+    # Layer 2: fast Nominatim tag check (only for name-based searches)
     if nominatim_env:
         return jsonify(apply_env_override(result, nominatim_env, "OpenStreetMap search"))
 
-    # Layer 3: Overpass world-map query (handles any location/name globally)
-    overpass_env = check_via_overpass(lat, lon)
-    if overpass_env:
-        apply_env_override(result, overpass_env, "OpenStreetMap world map")
+    # Layer 3: Overpass world-map query
+    # PERFORMANCE RULE: Only call Overpass when:
+    #   (a) The request came from a location NAME search (not raw lat/lon click)
+    #   (b) The local GeoJSON result is still LOW/MEDIUM
+    # For raw lat/lon clicks, local data is the source of truth → instant response
+    if location_name:   # name search → user typed a place name → check world map
+        overpass_env = check_via_overpass(lat, lon)
+        if overpass_env:
+            apply_env_override(result, overpass_env, "OpenStreetMap world map")
 
     return jsonify(result)
 
