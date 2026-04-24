@@ -2,6 +2,7 @@ import json
 import os
 import urllib.parse
 import urllib.request
+from functools import lru_cache
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -90,6 +91,66 @@ def geocode(place_name):
         hit.get("class", "").lower(),   # e.g. "natural", "boundary", "water"
         hit.get("type",  "").lower(),   # e.g. "wood", "national_park", "lake"
     )
+
+
+def _best_reverse_name(data, fallback="Unknown Location"):
+    """Build a human-readable place label from Nominatim reverse-geocode data."""
+    display_name = (data.get("display_name") or "").strip()
+    if display_name:
+        return display_name
+
+    address = data.get("address", {})
+    parts = [
+        address.get("city"),
+        address.get("town"),
+        address.get("village"),
+        address.get("hamlet"),
+        address.get("suburb"),
+        address.get("county"),
+        address.get("state_district"),
+        address.get("state"),
+        address.get("country"),
+    ]
+
+    deduped = []
+    seen = set()
+    for part in parts:
+        clean = (part or "").strip()
+        if clean and clean not in seen:
+            deduped.append(clean)
+            seen.add(clean)
+
+    return ", ".join(deduped) if deduped else fallback
+
+
+@lru_cache(maxsize=256)
+def reverse_geocode_cached(lat_key, lon_key):
+    """
+    Reverse geocode rounded coordinates to a readable place name.
+    Cached to avoid repeated calls for the same clicked/input location.
+    """
+    params = urllib.parse.urlencode({
+        "lat": lat_key,
+        "lon": lon_key,
+        "format": "json",
+        "zoom": 14,
+        "addressdetails": 1,
+    })
+    url = f"https://nominatim.openstreetmap.org/reverse?{params}"
+    req = urllib.request.Request(url, headers={"User-Agent": "LandSafetyChecker/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        if data.get("error"):
+            return "Unknown Location"
+        return _best_reverse_name(data)
+    except Exception:
+        return "Unknown Location"
+
+
+def reverse_geocode(lat, lon):
+    """Reverse geocode lat/lon with lightweight coordinate normalization."""
+    return reverse_geocode_cached(round(float(lat), 6), round(float(lon), 6))
 
 
 # ============================================================
@@ -579,6 +640,11 @@ def api_analyze():
     except (TypeError, ValueError):
         return jsonify({"error": "lat and lon must be numbers"}), 400
 
+    # Reverse geocode only for coordinate-driven analysis that did not
+    # already resolve a place name via forward geocoding.
+    if not resolved_name:
+        resolved_name = reverse_geocode(lat, lon)
+
     # ----- Layer 0: Ocean/Sea detection -----
     land_check = is_on_land(lat, lon)
     if land_check is False:
@@ -596,8 +662,8 @@ def api_analyze():
             "lat": lat,
             "lon": lon,
         }
-        if resolved_name:
-            result["resolved_name"] = resolved_name
+        result["resolved_name"] = resolved_name or "Unknown Location"
+        result["location_name"] = result["resolved_name"]
         generate_explanation(result)
         if purpose:
             apply_purpose_interpretation(result, purpose)
@@ -608,8 +674,8 @@ def api_analyze():
     result = analyze_risk(lat, lon)
     result["lat"] = lat
     result["lon"] = lon
-    if resolved_name:
-        result["resolved_name"] = resolved_name
+    result["resolved_name"] = resolved_name or "Unknown Location"
+    result["location_name"] = result["resolved_name"]
 
     if result["risk"] == "HIGH":
         generate_explanation(result)

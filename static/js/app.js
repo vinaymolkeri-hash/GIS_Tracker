@@ -197,8 +197,8 @@ async function searchLocation() {
         map.setView([lat, lon], 13);
 
         // Show resolved name
-        if (data.resolved_name) {
-            showResolvedName(data.resolved_name);
+        if (data.location_name || data.resolved_name) {
+            showResolvedName(data.location_name || data.resolved_name);
         }
 
         // Hide hint
@@ -264,6 +264,11 @@ async function runAnalysis(lat, lon) {
         if (!res.ok) throw new Error(`API error: ${res.status}`);
 
         const data = await res.json();
+        if (data.location_name || data.resolved_name) {
+            showResolvedName(data.location_name || data.resolved_name);
+        } else {
+            hideResolvedName();
+        }
         renderResults(data);
     } catch (err) {
         console.error(err);
@@ -290,8 +295,9 @@ function renderResults(data) {
     const fDist = data.forest_distance_m === 0 ? '0 m (inside)' : `${data.forest_distance_m} m`;
 
     // ── Location sub-heading ──────────────────────────────────────
-    const locLabel = data.resolved_name
-        ? data.resolved_name.split(',')[0]
+    const locationName = data.location_name || data.resolved_name || 'Unknown Location';
+    const locLabel = locationName !== 'Unknown Location'
+        ? locationName
         : `${data.lat?.toFixed(4)}, ${data.lon?.toFixed(4)}`;
 
     // ── Purpose interpretation ────────────────────────────────────
@@ -324,13 +330,24 @@ function renderResults(data) {
           <div class="report-row" style="align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
             <span style="font-size:1.4rem;">${icons[risk]}</span>
             <div>
+              <div class="report-label">Location</div>
+              <div class="report-sub">${locLabel}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-divider"></div>
+
+        <div class="report-section">
+          <div class="report-row" style="align-items:center; gap:0.5rem; margin-bottom:0.25rem;">
+            <span style="font-size:1.4rem;">⚠️</span>
+            <div>
               <div class="report-label">Risk Level</div>
               <div class="report-value" style="color:${col.text}; font-size:1.3rem; font-weight:800; letter-spacing:0.04em;">
                 ${risk}
               </div>
             </div>
           </div>
-          <div class="report-sub">${locLabel}</div>
         </div>
 
         <div class="report-divider"></div>
