@@ -353,6 +353,7 @@ def apply_env_override(result, env_type, source):
         result.update({
             "risk":             "HIGH",
             "forest_risk":      "HIGH",
+            "inside_forest":    True,
             "forest_reason":    f"Inside a forest/protected area ({source})",
             "forest_distance_m": 0,
             "legal_risk":       "Not suitable for construction",
@@ -365,6 +366,7 @@ def apply_env_override(result, env_type, source):
         result.update({
             "risk":            "HIGH",
             "water_risk":      "HIGH",
+            "inside_water":    True,
             "water_reason":    f"Inside a water body ({source})",
             "water_distance_m": 0,
             "legal_risk":      "Not suitable for construction",
@@ -377,24 +379,190 @@ def apply_env_override(result, env_type, source):
 
 
 # ============================================================
+# PURPOSE-BASED INTERPRETATION LAYER
+# ============================================================
+
+VALID_PURPOSES = {"residential", "farming", "commercial"}
+
+PURPOSE_LABELS = {
+    "residential": "Residential",
+    "farming":     "Farming (Agriculture)",
+    "commercial":  "Commercial",
+}
+
+# Recommendation matrix: PURPOSE_RECOMMENDATIONS[risk][purpose]
+PURPOSE_RECOMMENDATIONS = {
+    "HIGH": {
+        "residential": "Not suitable for housing",
+        "farming":     "Not suitable for cultivation",
+        "commercial":  "Not suitable for development",
+    },
+    "MEDIUM": {
+        "residential": "Construction allowed with restrictions",
+        "farming":     "Possible with caution (water proximity)",
+        "commercial":  "Requires legal/environmental clearance",
+    },
+    "LOW": {
+        "residential": "Suitable for housing",
+        "farming":     "Suitable for agriculture",
+        "commercial":  "Suitable for development",
+    },
+}
+
+
+def apply_purpose_interpretation(result, purpose):
+    """
+    Add purpose-specific fields to the result dict.
+    Does NOT modify risk calculation — only adds interpretation.
+    """
+    if purpose not in VALID_PURPOSES:
+        return result
+
+    risk = result.get("risk", "LOW")
+    result["purpose"]                = purpose
+    result["purpose_label"]          = PURPOSE_LABELS[purpose]
+    result["purpose_recommendation"] = PURPOSE_RECOMMENDATIONS[risk][purpose]
+    return result
+
+
+# ============================================================
+# STRUCTURED REASONING ENGINE
+# ============================================================
+
+def generate_explanation(result):
+    """
+    Build a structured, deterministic explanation from spatial results.
+    Does NOT modify risk — only adds explanation fields.
+
+    Adds:
+      - triggered_factors  : list of short factor strings
+      - explanation_reasons : list of detailed reason strings
+      - detailed_explanation: single human-readable paragraph
+    """
+    risk          = result.get("risk", "LOW")
+    water_dist    = result.get("water_distance_m")
+    forest_dist   = result.get("forest_distance_m")
+    inside_water  = bool(result.get("inside_water"))
+    inside_forest = bool(result.get("inside_forest"))
+
+    triggered = []
+    reasons   = []
+
+    # ── Inside water body ─────────────────────────────────────────
+    if inside_water:
+        triggered.append("Inside water body")
+        reasons.append(
+            "The location lies within a water body, making it "
+            "physically unsuitable for land-based use."
+        )
+
+    # ── Inside forest / protected zone ────────────────────────────
+    if inside_forest:
+        triggered.append("Inside forest zone")
+        reasons.append(
+            "The location lies within a forest or eco-sensitive zone, "
+            "where construction and development are legally restricted."
+        )
+
+    # ── Near water (distance < 100m but not inside) ──────────────
+    if (not inside_water) and water_dist is not None and 0 < water_dist < 100:
+        triggered.append(f"Near water body ({water_dist} m)")
+        reasons.append(
+            "The location is within close proximity to a water body, "
+            "which may pose flood risk and regulatory restrictions."
+        )
+
+    # ── Near forest (distance < 100m but not inside) ─────────────
+    if (not inside_forest) and forest_dist is not None and 0 < forest_dist < 100:
+        triggered.append(f"Near forest boundary ({forest_dist} m)")
+        reasons.append(
+            "The location is near a forest boundary, which may have "
+            "environmental buffer restrictions."
+        )
+
+    # ── Safe — no triggers ────────────────────────────────────────
+    if not triggered:
+        triggered.append("No restricted zone detected")
+        reasons.append(
+            "The location is at a safe distance from all mapped "
+            "water bodies and forest zones."
+        )
+
+    # ── Build detailed paragraph ──────────────────────────────────
+    if risk == "HIGH":
+        # Combine factor descriptions into a cohesive paragraph
+        factor_parts = []
+        if inside_water:
+            factor_parts.append(
+                "falls within a water body (sea, lake, or river)"
+            )
+        if inside_forest:
+            factor_parts.append(
+                "lies within a protected forest or eco-sensitive region"
+            )
+        if (not inside_water) and water_dist is not None and 0 < water_dist < 100:
+            factor_parts.append(f"is close to a water body ({water_dist} m away)")
+        if (not inside_forest) and forest_dist is not None and 0 < forest_dist < 100:
+            factor_parts.append(f"is near a forest boundary ({forest_dist} m away)")
+        combined = " and ".join(factor_parts) if factor_parts else "intersects a restricted zone"
+        detailed = (
+            f"This location {combined}. "
+            "Due to environmental regulations and ecological sensitivity, "
+            "any form of construction or land development is not advisable "
+            "without legal clearance."
+        )
+    elif risk == "MEDIUM":
+        proximity_parts = []
+        if water_dist is not None and 0 < water_dist < 100:
+            proximity_parts.append(f"a water body ({water_dist} m away)")
+        if forest_dist is not None and 0 < forest_dist < 100:
+            proximity_parts.append(f"a forest boundary ({forest_dist} m away)")
+        combined = " and ".join(proximity_parts) if proximity_parts else "a restricted zone"
+        detailed = (
+            f"This location is in close proximity to {combined}, "
+            "placing it within the 100-meter environmental buffer zone. "
+            "Development may require an Environmental Impact Assessment (EIA) "
+            "and additional regulatory clearance before proceeding."
+        )
+    else:
+        detailed = (
+            "This location is at a safe distance from all mapped water bodies "
+            "and forest zones. No environmental constraints were detected. "
+            "Standard building permits and local regulations apply."
+        )
+
+    result["triggered_factors"]    = triggered
+    result["explanation_reasons"]  = reasons
+    result["detailed_explanation"] = detailed
+    return result
+
+
+# ============================================================
 # API Routes
 # ============================================================
 
 @app.route("/api/analyze", methods=["POST"])
 def api_analyze():
     """
-    Accept lat/lon OR location_name.
+    Accept lat/lon OR location_name, plus optional "purpose".
     Three-layer environmental detection:
       1. Local GeoJSON (fast, offline)
       2. Nominatim search tags (fast, no extra call)
       3. Overpass world-map spatial query (accurate, global)
+    After risk is computed, an optional purpose-interpretation layer
+    adds user-friendly recommendations without altering risk logic.
     """
     body          = request.get_json(force=True)
     lat           = body.get("lat")
     lon           = body.get("lon")
     location_name = body.get("location_name")
+    purpose       = (body.get("purpose") or "").strip().lower()
     resolved_name = None
     nominatim_env = None
+
+    # Validate purpose (optional — ignored if invalid/missing)
+    if purpose and purpose not in VALID_PURPOSES:
+        return jsonify({"error": f"Invalid purpose. Allowed: {', '.join(sorted(VALID_PURPOSES))}"}), 400
 
     # --- Geocode if needed ---
     if location_name and (lat is None or lon is None):
@@ -421,8 +589,8 @@ def api_analyze():
             "forest_risk": "LOW",
             "inside_water": True,
             "inside_forest": False,
-            "distance_to_water": 0,
-            "distance_to_forest": None,
+            "water_distance_m": 0,
+            "forest_distance_m": None,
             "water_reason": "Location lies within a water body (sea/ocean)",
             "forest_reason": None,
             "lat": lat,
@@ -430,6 +598,9 @@ def api_analyze():
         }
         if resolved_name:
             result["resolved_name"] = resolved_name
+        generate_explanation(result)
+        if purpose:
+            apply_purpose_interpretation(result, purpose)
         return jsonify(result)
     # If land_check is True or None, continue with normal analysis
 
@@ -441,11 +612,18 @@ def api_analyze():
         result["resolved_name"] = resolved_name
 
     if result["risk"] == "HIGH":
+        generate_explanation(result)
+        if purpose:
+            apply_purpose_interpretation(result, purpose)
         return jsonify(result)   # early exit — no need for Overpass
 
     # Layer 2: fast Nominatim tag check (only for name-based searches)
     if nominatim_env:
-        return jsonify(apply_env_override(result, nominatim_env, "OpenStreetMap search"))
+        apply_env_override(result, nominatim_env, "OpenStreetMap search")
+        generate_explanation(result)
+        if purpose:
+            apply_purpose_interpretation(result, purpose)
+        return jsonify(result)
 
     # Layer 3: Overpass world-map query (global coverage for any coordinate)
     # Called for BOTH name-based and coordinate-based requests when local data
@@ -453,6 +631,13 @@ def api_analyze():
     overpass_env = check_via_overpass(lat, lon)
     if overpass_env:
         apply_env_override(result, overpass_env, "OpenStreetMap world map")
+
+    # Structured explanation (never changes risk)
+    generate_explanation(result)
+
+    # Purpose interpretation (final layer — never changes risk)
+    if purpose:
+        apply_purpose_interpretation(result, purpose)
 
     return jsonify(result)
 

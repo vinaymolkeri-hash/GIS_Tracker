@@ -202,9 +202,11 @@ def analyze_risk(lat: float, lon: float) -> dict:
     return {
         "risk":             overall,
         "water_risk":       water_risk,
+        "inside_water":     water_risk == "HIGH",
         "water_reason":     water_reason,
         "water_distance_m": water_dist,
         "forest_risk":      forest_risk,
+        "inside_forest":    forest_risk == "HIGH",
         "forest_reason":    forest_reason,
         "forest_distance_m": forest_dist,
         "flags":            flags,

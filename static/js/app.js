@@ -13,16 +13,17 @@ let selectedLat = null;
 let selectedLon = null;
 
 // ---------- DOM ----------
-const latInput       = document.getElementById('input-lat');
-const lonInput       = document.getElementById('input-lon');
-const btnAnalyze     = document.getElementById('btn-analyze');
-const resultsPanel   = document.getElementById('results-panel');
-const mapHint        = document.getElementById('map-hint');
-const toggleWater    = document.getElementById('toggle-water');
-const toggleForest   = document.getElementById('toggle-forest');
-const locationInput  = document.getElementById('input-location');
-const btnSearch      = document.getElementById('btn-search');
+const latInput = document.getElementById('input-lat');
+const lonInput = document.getElementById('input-lon');
+const btnAnalyze = document.getElementById('btn-analyze');
+const resultsPanel = document.getElementById('results-panel');
+const mapHint = document.getElementById('map-hint');
+const toggleWater = document.getElementById('toggle-water');
+const toggleForest = document.getElementById('toggle-forest');
+const locationInput = document.getElementById('input-location');
+const btnSearch = document.getElementById('btn-search');
 const resolvedNameEl = document.getElementById('resolved-name');
+const purposeInput = document.getElementById('input-purpose');
 
 // ---------- Map Init ----------
 function initMap() {
@@ -95,7 +96,7 @@ async function loadLayers() {
             fetch(`${API_BASE}/api/layers/forest`),
         ]);
 
-        const waterData  = await waterRes.json();
+        const waterData = await waterRes.json();
         const forestData = await forestRes.json();
 
         waterLayer = L.geoJSON(waterData, {
@@ -175,7 +176,7 @@ async function searchLocation() {
         const res = await fetch(`${API_BASE}/api/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ location_name: name }),
+            body: JSON.stringify({ location_name: name, purpose: purposeInput.value }),
         });
 
         const data = await res.json();
@@ -257,7 +258,7 @@ async function runAnalysis(lat, lon) {
         const res = await fetch(`${API_BASE}/api/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lat, lon }),
+            body: JSON.stringify({ lat, lon, purpose: purposeInput.value }),
         });
 
         if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -276,47 +277,35 @@ async function runAnalysis(lat, lon) {
 // ---------- Render Results ----------
 function renderResults(data) {
     const riskColors = {
-        HIGH:   { bg: 'hsla(0,84%,60%,0.10)',   border: 'hsl(0,84%,60%)',   text: 'hsl(0,84%,65%)' },
-        MEDIUM: { bg: 'hsla(38,92%,50%,0.10)',  border: 'hsl(38,92%,50%)',  text: 'hsl(38,92%,55%)' },
-        LOW:    { bg: 'hsla(142,71%,45%,0.10)', border: 'hsl(142,71%,45%)', text: 'hsl(142,71%,50%)' },
+        HIGH: { bg: 'hsla(0,84%,60%,0.10)', border: 'hsl(0,84%,60%)', text: 'hsl(0,84%,65%)' },
+        MEDIUM: { bg: 'hsla(38,92%,50%,0.10)', border: 'hsl(38,92%,50%)', text: 'hsl(38,92%,55%)' },
+        LOW: { bg: 'hsla(142,71%,45%,0.10)', border: 'hsl(142,71%,45%)', text: 'hsl(142,71%,50%)' },
     };
     const icons = { HIGH: '🔴', MEDIUM: '🟡', LOW: '🟢' };
-    const risk  = data.risk;
-    const col   = riskColors[risk] || riskColors.LOW;
-
-    // ── Triggered By ──────────────────────────────────────────────
-    const triggers = [];
-    if (data.water_risk === 'HIGH')   triggers.push('Inside water body');
-    if (data.forest_risk === 'HIGH')  triggers.push('Inside forest zone');
-    if (data.water_risk === 'MEDIUM') triggers.push(`Near water body (${data.water_distance_m} m)`);
-    if (data.forest_risk === 'MEDIUM')triggers.push(`Near forest zone (${data.forest_distance_m} m)`);
-    if (triggers.length === 0)        triggers.push('No restricted zone detected');
-
-    // ── Reason sentence ───────────────────────────────────────────
-    let reason = '';
-    if (risk === 'HIGH') {
-        if (data.water_risk === 'HIGH' && data.forest_risk === 'HIGH')
-            reason = 'Location intersects both a water layer and a forest zone → unsafe for construction.';
-        else if (data.water_risk === 'HIGH')
-            reason = 'Location intersects water layer → unsafe for construction.';
-        else
-            reason = 'Location intersects forest/protected zone → construction not permitted.';
-    } else if (risk === 'MEDIUM') {
-        const d   = Math.min(data.water_distance_m, data.forest_distance_m);
-        const type= data.water_distance_m < data.forest_distance_m ? 'water body' : 'forest zone';
-        reason = `Location is ${d} m from a ${type} (within the 100 m buffer zone) → possible restrictions apply.`;
-    } else {
-        reason = 'Location is far from all mapped water bodies and forest zones → no environmental constraint detected.';
-    }
+    const risk = data.risk;
+    const col = riskColors[risk] || riskColors.LOW;
 
     // ── Distances ─────────────────────────────────────────────────
-    const wDist = data.water_distance_m  === 0 ? '0 m (inside)' : `${data.water_distance_m} m`;
+    const wDist = data.water_distance_m === 0 ? '0 m (inside)' : `${data.water_distance_m} m`;
     const fDist = data.forest_distance_m === 0 ? '0 m (inside)' : `${data.forest_distance_m} m`;
 
     // ── Location sub-heading ──────────────────────────────────────
     const locLabel = data.resolved_name
         ? data.resolved_name.split(',')[0]
         : `${data.lat?.toFixed(4)}, ${data.lon?.toFixed(4)}`;
+
+    // ── Purpose interpretation ────────────────────────────────────
+    const purposeIcons = { residential: '🏠', farming: '🌾', commercial: '🏢' };
+    const purposeLabel = data.purpose_label || '';
+    const purposeRec = data.purpose_recommendation || '';
+    const purposeIcon = purposeIcons[data.purpose] || '🏷️';
+    const hasPurpose = !!data.purpose;
+    const finalRecommendation = purposeRec || data.recommendation || '';
+
+    // ── Structured explanation from backend ───────────────────────
+    const triggeredFactors = data.triggered_factors || [];
+    const explanationReasons = data.explanation_reasons || [];
+    const detailedExplanation = data.detailed_explanation || '';
 
     resultsPanel.innerHTML = `
       <div class="report-card" style="
@@ -346,31 +335,64 @@ function renderResults(data) {
 
         <div class="report-divider"></div>
 
-        <!-- ② Triggered By -->
+        ${hasPurpose ? `
+        <!-- ② Purpose Recommendation -->
+        <div class="report-section purpose-result">
+          <div class="report-label">Purpose: ${purposeIcon} ${purposeLabel}</div>
+          <div class="purpose-rec-card purpose-rec-${risk.toLowerCase()}">
+            <span class="purpose-rec-icon">${risk === 'HIGH' ? '⛔' : risk === 'MEDIUM' ? '⚠️' : '✅'}</span>
+            <span class="purpose-rec-text">${purposeRec}</span>
+          </div>
+        </div>
+
+        <div class="report-divider"></div>
+        ` : ''}
+
+        <!-- ③ Triggered Factors -->
         <div class="report-section">
-          <div class="report-label">Triggered By</div>
+          <div class="report-label">Triggered Factors</div>
           <ul class="report-list" style="border-left:2px solid ${col.border};">
-            ${triggers.map(t => `<li>${t}</li>`).join('')}
+            ${triggeredFactors.map(t => `<li>${t}</li>`).join('')}
           </ul>
         </div>
 
         <div class="report-divider"></div>
 
-        <!-- ③ Distance -->
+        <!-- ④ Detailed Explanation -->
+        <div class="report-section">
+          <div class="report-label">Detailed Explanation</div>
+          <div class="explanation-block explanation-${risk.toLowerCase()}">
+            <div class="explanation-text">${detailedExplanation}</div>
+          </div>
+          ${explanationReasons.length > 0 ? `
+          <div class="explanation-reasons">
+            ${explanationReasons.map(r => `
+              <div class="explanation-reason-item">
+                <span class="explanation-reason-bullet">›</span>
+                <span>${r}</span>
+              </div>
+            `).join('')}
+          </div>
+          ` : ''}
+        </div>
+
+        <div class="report-divider"></div>
+
+        <!-- ⑤ Distance -->
         <div class="report-section">
           <div class="report-label">Distance</div>
           <div class="report-dist-grid">
             <div class="dist-item">
               <span class="dist-icon">💧</span>
               <span class="dist-label">Water</span>
-              <span class="dist-val" style="color:${data.water_risk==='HIGH'?'hsl(0,84%,65%)':data.water_risk==='MEDIUM'?'hsl(38,92%,55%)':'var(--text-secondary)'};">
+              <span class="dist-val" style="color:${data.water_risk === 'HIGH' ? 'hsl(0,84%,65%)' : data.water_risk === 'MEDIUM' ? 'hsl(38,92%,55%)' : 'var(--text-secondary)'};">
                 ${wDist}
               </span>
             </div>
             <div class="dist-item">
               <span class="dist-icon">🌲</span>
               <span class="dist-label">Forest</span>
-              <span class="dist-val" style="color:${data.forest_risk==='HIGH'?'hsl(0,84%,65%)':data.forest_risk==='MEDIUM'?'hsl(38,92%,55%)':'var(--text-secondary)'};">
+              <span class="dist-val" style="color:${data.forest_risk === 'HIGH' ? 'hsl(0,84%,65%)' : data.forest_risk === 'MEDIUM' ? 'hsl(38,92%,55%)' : 'var(--text-secondary)'};">
                 ${fDist}
               </span>
             </div>
@@ -379,21 +401,13 @@ function renderResults(data) {
 
         <div class="report-divider"></div>
 
-        <!-- ④ Reason -->
-        <div class="report-section">
-          <div class="report-label">Reason</div>
-          <div class="report-reason">${reason}</div>
-        </div>
-
-        <div class="report-divider"></div>
-
-        <!-- ⑤ Recommendation -->
+        <!-- ⑥ Recommendation -->
         <div class="report-section">
           <div class="report-label">Recommendation</div>
-          <div class="report-rec" style="color:${col.text};">${data.recommendation}</div>
+          <div class="report-rec" style="color:${col.text};">${finalRecommendation}</div>
         </div>
 
-        <!-- ⑥ Legal -->
+        <!-- ⑦ Legal -->
         <div class="report-legal">⚖️ Legal: ${data.legal_risk}</div>
 
       </div>
@@ -434,37 +448,6 @@ function clearError() {
 // ---------- Input Events ----------
 latInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnAnalyze.click(); });
 lonInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnAnalyze.click(); });
-
-// ---------- Init ----------
-document.addEventListener('DOMContentLoaded', initMap);
-
-
-
-
-
-// ---------- Error Handling ----------
-function showError(msg) {
-    clearError();
-    const el = document.createElement('div');
-    el.className = 'error-message';
-    el.id = 'error-msg';
-    el.textContent = msg;
-    document.querySelector('.coord-panel').appendChild(el);
-}
-
-function clearError() {
-    const existing = document.getElementById('error-msg');
-    if (existing) existing.remove();
-}
-
-// ---------- Input Events ----------
-latInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') btnAnalyze.click();
-});
-
-lonInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') btnAnalyze.click();
-});
 
 // ---------- Init ----------
 document.addEventListener('DOMContentLoaded', initMap);

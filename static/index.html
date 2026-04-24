@@ -1,22 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Land Safety Checker — Analyze environmental risk for any location by checking proximity to water bodies and forest zones using GIS data.">
+    <meta name="description"
+        content="Land Safety Checker — Analyze environmental risk for any location by checking proximity to water bodies and forest zones using GIS data.">
     <title>Land Safety Checker — GIS Risk Analysis</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin="" />
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
     <!-- App CSS -->
     <link rel="stylesheet" href="/static/css/style.css">
 
     <!-- Favicon (data URI) -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 </head>
+
 <body>
     <div class="app-container">
 
@@ -54,7 +57,8 @@
                 <div class="search-panel" id="search-panel">
                     <div class="coord-panel-title">🔍 Search Location</div>
                     <div class="search-input-row">
-                        <input type="text" id="input-location" placeholder="e.g. Bangalore, Mysore..." class="search-input">
+                        <input type="text" id="input-location" placeholder="e.g. Bangalore, Mysore..."
+                            class="search-input">
                         <button class="btn-search" id="btn-search">
                             <span class="btn-text">🔎</span>
                         </button>
@@ -68,13 +72,29 @@
                     <div class="coord-inputs">
                         <div class="input-group">
                             <label for="input-lat">Latitude</label>
-                            <input type="number" id="input-lat" step="0.000001" value="9.850000" placeholder="e.g. 9.85">
+                            <input type="number" id="input-lat" step="0.000001" value="9.850000"
+                                placeholder="e.g. 9.85">
                         </div>
                         <div class="input-group">
                             <label for="input-lon">Longitude</label>
-                            <input type="number" id="input-lon" step="0.000001" value="76.200000" placeholder="e.g. 76.2">
+                            <input type="number" id="input-lon" step="0.000001" value="76.200000"
+                                placeholder="e.g. 76.2">
                         </div>
                     </div>
+
+                    <!-- Purpose Selection -->
+                    <div class="purpose-panel" id="purpose-panel">
+                        <div class="input-group">
+                            <label for="input-purpose">🏷️ Intended Land Use</label>
+                            <select id="input-purpose" class="purpose-select">
+                                <option value="" disabled>Select purpose…</option>
+                                <option value="residential" selected>🏠 Residential</option>
+                                <option value="farming">🌾 Farming (Agriculture)</option>
+                                <option value="commercial">🏢 Commercial</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <button class="btn-analyze" id="btn-analyze">
                         <span class="btn-text">⚡ Analyze Risk</span>
                     </button>
@@ -170,21 +190,24 @@
                                         <span class="rule-dot dot-high"></span>
                                         <strong>HIGH Risk</strong>
                                     </div>
-                                    <p>Location is <em>inside</em> a water body or forest zone. Construction is not permitted — violates environmental protection laws.</p>
+                                    <p>Location is <em>inside</em> a water body or forest zone. Construction is not
+                                        permitted — violates environmental protection laws.</p>
                                 </div>
                                 <div class="rule-card rule-medium">
                                     <div class="rule-header">
                                         <span class="rule-dot dot-medium"></span>
                                         <strong>MEDIUM Risk</strong>
                                     </div>
-                                    <p>Location is within <em>100 meters</em> of a sensitive zone. May require environmental clearance before development.</p>
+                                    <p>Location is within <em>100 meters</em> of a sensitive zone. May require
+                                        environmental clearance before development.</p>
                                 </div>
                                 <div class="rule-card rule-low">
                                     <div class="rule-header">
                                         <span class="rule-dot dot-low"></span>
                                         <strong>LOW Risk</strong>
                                     </div>
-                                    <p>Location is at a safe distance (&gt;100m) from all zones. Standard permits apply.</p>
+                                    <p>Location is at a safe distance (&gt;100m) from all zones. Standard permits apply.
+                                    </p>
                                 </div>
                             </div>
 
@@ -223,10 +246,10 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <!-- App JS -->
     <script src="/static/js/app.js"></script>
 </body>
+
 </html>
