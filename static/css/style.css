@@ -365,6 +365,7 @@ body::before {
     line-height: 1.4;
     animation: fadeIn 0.3s ease;
     word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .resolved-name.hidden {
@@ -1056,6 +1057,8 @@ body::before {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 0.1rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 /* Triggered By list */

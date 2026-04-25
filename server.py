@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import unicodedata
 import urllib.parse
 import urllib.request
 from functools import lru_cache
@@ -15,11 +17,100 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 CORS(app)
 
 
+UNKNOWN_LOCATION = "Unknown Location"
+SAFE_FALLBACK_MESSAGE = "No restricted zones detected within available dataset coverage"
+
+
+def _read_json_response(req, timeout):
+    """Read JSON safely with explicit UTF-8 handling."""
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read()
+    return json.loads(raw.decode("utf-8", errors="replace"))
+
+
+def _normalize_text(value):
+    """Normalize text and remove broken/control characters."""
+    text = unicodedata.normalize("NFKC", str(value or "")).replace("\ufffd", " ")
+    text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C")
+    text = re.sub(r"\s+", " ", text).strip(" ,;-")
+    return text
+
+
+def _clean_location_text(value):
+    """Return a human-readable location label or empty string."""
+    text = _normalize_text(value)
+    return text if text else ""
+
+
+def _is_demo_safe_location(text):
+    """Prefer labels that are readable in common Latin-script UIs."""
+    cleaned = _clean_location_text(text)
+    return bool(cleaned and re.search(r"[A-Za-z0-9]", cleaned))
+
+
+@lru_cache(maxsize=512)
+def fetch_reverse_data_cached(lat_key, lon_key, zoom):
+    """Cached reverse geocode payload for location labeling and water checks."""
+    params = urllib.parse.urlencode({
+        "lat": lat_key,
+        "lon": lon_key,
+        "format": "json",
+        "zoom": zoom,
+        "addressdetails": 1,
+        "accept-language": "en",
+    })
+    url = f"https://nominatim.openstreetmap.org/reverse?{params}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "LandSafetyChecker/1.0",
+            "Accept-Language": "en",
+        },
+    )
+    try:
+        return _read_json_response(req, timeout=5)
+    except Exception:
+        return {}
+
+
+def fetch_reverse_data(lat, lon, zoom=14):
+    """Reverse geocode data with coordinate normalization for cache stability."""
+    return fetch_reverse_data_cached(round(float(lat), 6), round(float(lon), 6), int(zoom))
+
+
+def _reverse_indicates_water(data):
+    """Return True when reverse-geocode metadata clearly indicates water."""
+    if not data:
+        return False
+    if data.get("error"):
+        return True
+
+    osm_type = _normalize_text(data.get("type", "")).lower()
+    osm_class = _normalize_text(data.get("class", "")).lower()
+    display_name = _normalize_text(data.get("display_name", "")).lower()
+    address = data.get("address") or {}
+
+    water_types = {
+        "ocean", "sea", "strait", "gulf", "bay", "coastline",
+        "water", "lake", "reservoir", "river", "riverbank",
+        "lagoon", "wetland",
+    }
+    water_classes = {"water", "waterway"}
+
+    if osm_type in water_types or osm_class in water_classes:
+        return True
+    if any(keyword in display_name for keyword in water_types):
+        return True
+    if not address.get("country_code") and osm_type in water_types:
+        return True
+    return False
+
+
 # ============================================================
 # LAYER 0 — Ocean / Sea Detector (reverse geocode check)
 # ============================================================
 
-def is_on_land(lat, lon):
+def is_on_land(lat, lon, reverse_data=None):
     """
     Check if a coordinate is on land or in ocean/sea.
     Uses Nominatim reverse geocoding:
@@ -31,36 +122,12 @@ def is_on_land(lat, lon):
         False → point is in ocean/sea (HIGH risk)
         None  → could not determine (treat as land, let other layers handle)
     """
-    params = urllib.parse.urlencode({
-        "lat": lat, "lon": lon,
-        "format": "json", "zoom": 5,
-    })
-    url = f"https://nominatim.openstreetmap.org/reverse?{params}"
-    req = urllib.request.Request(url, headers={"User-Agent": "LandSafetyChecker/1.0"})
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode())
-
-        # Nominatim returns {"error": "..."} for ocean points
-        if "error" in data:
-            return False   # ocean — not on land
-
-        # Check if it's tagged as ocean/sea explicitly
-        osm_type = data.get("type", "").lower()
-        osm_class = data.get("class", "").lower()
-        name = data.get("display_name", "").lower()
-
-        ocean_keywords = {"ocean", "sea", "strait", "gulf", "bay"}
-        if osm_type in ocean_keywords or osm_class in {"place", "natural"} and osm_type in ocean_keywords:
+        data = reverse_data or fetch_reverse_data(lat, lon, zoom=5)
+        if _reverse_indicates_water(data):
             return False
 
-        # Check name for ocean/sea references
-        for kw in ocean_keywords:
-            if kw in name:
-                return False
-
-        # Has a country code → it's on land
-        address = data.get("address", {})
+        address = (data or {}).get("address", {})
         if address.get("country_code"):
             return True
 
@@ -71,12 +138,22 @@ def is_on_land(lat, lon):
 
 def geocode(place_name):
     """Query Nominatim to convert a place name to coordinates + OSM class/type."""
-    params = urllib.parse.urlencode({"q": place_name, "format": "json", "limit": 1})
+    params = urllib.parse.urlencode({
+        "q": place_name,
+        "format": "json",
+        "limit": 1,
+        "accept-language": "en",
+    })
     url = f"https://nominatim.openstreetmap.org/search?{params}"
-    req = urllib.request.Request(url, headers={"User-Agent": "LandSafetyChecker/1.0"})
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "LandSafetyChecker/1.0",
+            "Accept-Language": "en",
+        },
+    )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            results = json.loads(resp.read().decode())
+        results = _read_json_response(req, timeout=10)
     except Exception as e:
         return None, None, str(e), None, None
 
@@ -87,40 +164,39 @@ def geocode(place_name):
     return (
         float(hit["lat"]),
         float(hit["lon"]),
-        hit.get("display_name", place_name),
-        hit.get("class", "").lower(),   # e.g. "natural", "boundary", "water"
-        hit.get("type",  "").lower(),   # e.g. "wood", "national_park", "lake"
+        _clean_location_text(hit.get("display_name", place_name)) or _clean_location_text(place_name) or UNKNOWN_LOCATION,
+        _normalize_text(hit.get("class", "")).lower(),   # e.g. "natural", "boundary", "water"
+        _normalize_text(hit.get("type",  "")).lower(),   # e.g. "wood", "national_park", "lake"
     )
 
 
-def _best_reverse_name(data, fallback="Unknown Location"):
+def _best_reverse_name(data, fallback=UNKNOWN_LOCATION):
     """Build a human-readable place label from Nominatim reverse-geocode data."""
-    display_name = (data.get("display_name") or "").strip()
-    if display_name:
+    display_name = _clean_location_text(data.get("display_name"))
+    if _is_demo_safe_location(display_name):
         return display_name
 
     address = data.get("address", {})
-    parts = [
-        address.get("city"),
-        address.get("town"),
-        address.get("village"),
-        address.get("hamlet"),
-        address.get("suburb"),
-        address.get("county"),
-        address.get("state_district"),
-        address.get("state"),
-        address.get("country"),
-    ]
+    locality = (
+        _clean_location_text(address.get("city"))
+        or _clean_location_text(address.get("town"))
+        or _clean_location_text(address.get("village"))
+        or _clean_location_text(address.get("hamlet"))
+    )
+    state = _clean_location_text(address.get("state"))
+    country = _clean_location_text(address.get("country"))
+    parts = [locality, state, country]
 
     deduped = []
     seen = set()
     for part in parts:
-        clean = (part or "").strip()
+        clean = _clean_location_text(part)
         if clean and clean not in seen:
             deduped.append(clean)
             seen.add(clean)
 
-    return ", ".join(deduped) if deduped else fallback
+    fallback_name = ", ".join(deduped) if deduped else fallback
+    return _clean_location_text(fallback_name) or fallback
 
 
 @lru_cache(maxsize=256)
@@ -129,23 +205,13 @@ def reverse_geocode_cached(lat_key, lon_key):
     Reverse geocode rounded coordinates to a readable place name.
     Cached to avoid repeated calls for the same clicked/input location.
     """
-    params = urllib.parse.urlencode({
-        "lat": lat_key,
-        "lon": lon_key,
-        "format": "json",
-        "zoom": 14,
-        "addressdetails": 1,
-    })
-    url = f"https://nominatim.openstreetmap.org/reverse?{params}"
-    req = urllib.request.Request(url, headers={"User-Agent": "LandSafetyChecker/1.0"})
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode())
+        data = fetch_reverse_data_cached(lat_key, lon_key, 14)
         if data.get("error"):
-            return "Unknown Location"
+            return UNKNOWN_LOCATION
         return _best_reverse_name(data)
     except Exception:
-        return "Unknown Location"
+        return UNKNOWN_LOCATION
 
 
 def reverse_geocode(lat, lon):
@@ -327,6 +393,8 @@ def _classify_elements(isin_elements, around_elements):
         # Water bodies: ponds, lakes, wetlands (but not just any waterway=drain)
         if tags.get("natural", "").lower() in {"water", "wetland"}:
             return "water"
+        if tags.get("waterway", "").lower() in {"river", "riverbank", "canal", "stream"}:
+            return "water"
         if tags.get("landuse", "").lower() in {"reservoir", "basin"}:
             return "water"
         # Protected/wilderness areas
@@ -417,6 +485,7 @@ def apply_env_override(result, env_type, source):
             "inside_forest":    True,
             "forest_reason":    f"Inside a forest/protected area ({source})",
             "forest_distance_m": 0,
+            "distance_to_forest": 0,
             "legal_risk":       "Not suitable for construction",
             "recommendation":   "Not recommended",
             "osm_override":     True,
@@ -430,12 +499,35 @@ def apply_env_override(result, env_type, source):
             "inside_water":    True,
             "water_reason":    f"Inside a water body ({source})",
             "water_distance_m": 0,
+            "distance_to_water": 0,
             "legal_risk":      "Not suitable for construction",
             "recommendation":  "Not recommended",
             "osm_override":    True,
         })
         result["flags"].append(f"Inside water body ({source})")
 
+    return result
+
+
+def enforce_water_high_risk(result, source="Water detection"):
+    """Ensure any inside-water detection is always surfaced as HIGH risk."""
+    inside_water = bool(result.get("inside_water"))
+    water_distance = result.get("water_distance_m")
+    if inside_water or water_distance == 0:
+        result.update({
+            "risk": "HIGH",
+            "water_risk": "HIGH",
+            "inside_water": True,
+            "water_distance_m": 0,
+            "distance_to_water": 0,
+            "legal_risk": "Not suitable for construction",
+            "recommendation": "Not recommended",
+        })
+        if not result.get("water_reason"):
+            result["water_reason"] = f"Inside a water body ({source})"
+        flags = result.setdefault("flags", [])
+        if not any("Inside water body" in flag for flag in flags):
+            flags.append(f"Inside water body ({source})")
     return result
 
 
@@ -535,7 +627,7 @@ def generate_explanation(result):
 
     # ── Near forest (distance < 100m but not inside) ─────────────
     if (not inside_forest) and forest_dist is not None and 0 < forest_dist < 100:
-        triggered.append(f"Near forest boundary ({forest_dist} m)")
+        triggered.append(f"Near forest zone ({forest_dist} m)")
         reasons.append(
             "The location is near a forest boundary, which may have "
             "environmental buffer restrictions."
@@ -543,10 +635,9 @@ def generate_explanation(result):
 
     # ── Safe — no triggers ────────────────────────────────────────
     if not triggered:
-        triggered.append("No restricted zone detected")
+        triggered.append("No water or forest zones detected within threshold distance")
         reasons.append(
-            "The location is at a safe distance from all mapped "
-            "water bodies and forest zones."
+            SAFE_FALLBACK_MESSAGE
         )
 
     # ── Build detailed paragraph ──────────────────────────────────
@@ -564,7 +655,7 @@ def generate_explanation(result):
         if (not inside_water) and water_dist is not None and 0 < water_dist < 100:
             factor_parts.append(f"is close to a water body ({water_dist} m away)")
         if (not inside_forest) and forest_dist is not None and 0 < forest_dist < 100:
-            factor_parts.append(f"is near a forest boundary ({forest_dist} m away)")
+            factor_parts.append(f"is near a forest zone ({forest_dist} m away)")
         combined = " and ".join(factor_parts) if factor_parts else "intersects a restricted zone"
         detailed = (
             f"This location {combined}. "
@@ -577,7 +668,7 @@ def generate_explanation(result):
         if water_dist is not None and 0 < water_dist < 100:
             proximity_parts.append(f"a water body ({water_dist} m away)")
         if forest_dist is not None and 0 < forest_dist < 100:
-            proximity_parts.append(f"a forest boundary ({forest_dist} m away)")
+            proximity_parts.append(f"a forest zone ({forest_dist} m away)")
         combined = " and ".join(proximity_parts) if proximity_parts else "a restricted zone"
         detailed = (
             f"This location is in close proximity to {combined}, "
@@ -587,9 +678,9 @@ def generate_explanation(result):
         )
     else:
         detailed = (
-            "This location is at a safe distance from all mapped water bodies "
-            "and forest zones. No environmental constraints were detected. "
-            "Standard building permits and local regulations apply."
+            f"{SAFE_FALLBACK_MESSAGE}. "
+            "Based on the currently available mapped layers, the location appears "
+            "to be outside water and forest restriction thresholds."
         )
 
     result["triggered_factors"]    = triggered
@@ -620,6 +711,7 @@ def api_analyze():
     purpose       = (body.get("purpose") or "").strip().lower()
     resolved_name = None
     nominatim_env = None
+    reverse_data  = None
 
     # Validate purpose (optional — ignored if invalid/missing)
     if purpose and purpose not in VALID_PURPOSES:
@@ -640,13 +732,16 @@ def api_analyze():
     except (TypeError, ValueError):
         return jsonify({"error": "lat and lon must be numbers"}), 400
 
+    reverse_data = fetch_reverse_data(lat, lon, zoom=14)
+
     # Reverse geocode only for coordinate-driven analysis that did not
     # already resolve a place name via forward geocoding.
     if not resolved_name:
-        resolved_name = reverse_geocode(lat, lon)
+        resolved_name = _best_reverse_name(reverse_data)
+    resolved_name = _clean_location_text(resolved_name) or UNKNOWN_LOCATION
 
     # ----- Layer 0: Ocean/Sea detection -----
-    land_check = is_on_land(lat, lon)
+    land_check = is_on_land(lat, lon, reverse_data=reverse_data)
     if land_check is False:
         # Point is in ocean/sea → HIGH risk directly
         result = {
@@ -656,14 +751,20 @@ def api_analyze():
             "inside_water": True,
             "inside_forest": False,
             "water_distance_m": 0,
+            "distance_to_water": 0,
             "forest_distance_m": None,
+            "distance_to_forest": None,
             "water_reason": "Location lies within a water body (sea/ocean)",
             "forest_reason": None,
             "lat": lat,
             "lon": lon,
+            "flags": ["Inside water body"],
+            "legal_risk": "Not suitable for construction",
+            "recommendation": "Not recommended",
         }
-        result["resolved_name"] = resolved_name or "Unknown Location"
+        result["resolved_name"] = resolved_name
         result["location_name"] = result["resolved_name"]
+        enforce_water_high_risk(result, source="Ocean/sea detection")
         generate_explanation(result)
         if purpose:
             apply_purpose_interpretation(result, purpose)
@@ -674,10 +775,16 @@ def api_analyze():
     result = analyze_risk(lat, lon)
     result["lat"] = lat
     result["lon"] = lon
-    result["resolved_name"] = resolved_name or "Unknown Location"
+    result["resolved_name"] = resolved_name
     result["location_name"] = result["resolved_name"]
+    result["distance_to_water"] = result.get("water_distance_m")
+    result["distance_to_forest"] = result.get("forest_distance_m")
+    if result.get("water_distance_m") == 0:
+        result["inside_water"] = True
+        enforce_water_high_risk(result, source="Local GIS layer")
 
     if result["risk"] == "HIGH":
+        enforce_water_high_risk(result, source="Local GIS layer")
         generate_explanation(result)
         if purpose:
             apply_purpose_interpretation(result, purpose)
@@ -686,6 +793,7 @@ def api_analyze():
     # Layer 2: fast Nominatim tag check (only for name-based searches)
     if nominatim_env:
         apply_env_override(result, nominatim_env, "OpenStreetMap search")
+        enforce_water_high_risk(result, source="OpenStreetMap search")
         generate_explanation(result)
         if purpose:
             apply_purpose_interpretation(result, purpose)
@@ -697,6 +805,7 @@ def api_analyze():
     overpass_env = check_via_overpass(lat, lon)
     if overpass_env:
         apply_env_override(result, overpass_env, "OpenStreetMap world map")
+        enforce_water_high_risk(result, source="OpenStreetMap world map")
 
     # Structured explanation (never changes risk)
     generate_explanation(result)

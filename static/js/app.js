@@ -25,6 +25,29 @@ const btnSearch = document.getElementById('btn-search');
 const resolvedNameEl = document.getElementById('resolved-name');
 const purposeInput = document.getElementById('input-purpose');
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function cleanLocationName(value) {
+    const text = String(value ?? '')
+        .replace(/\uFFFD/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return text || 'Unknown Location';
+}
+
+function formatDistance(value) {
+    if (value === 0) return '0 m';
+    if (typeof value === 'number' && Number.isFinite(value)) return `${value} m`;
+    return 'Not available';
+}
+
 // ---------- Map Init ----------
 function initMap() {
     map = L.map('map', {
@@ -217,7 +240,7 @@ async function searchLocation() {
 }
 
 function showResolvedName(name) {
-    resolvedNameEl.textContent = `📍 ${name}`;
+    resolvedNameEl.textContent = `📍 ${cleanLocationName(name)}`;
     resolvedNameEl.classList.remove('hidden');
 }
 
@@ -291,11 +314,13 @@ function renderResults(data) {
     const col = riskColors[risk] || riskColors.LOW;
 
     // ── Distances ─────────────────────────────────────────────────
-    const wDist = data.water_distance_m === 0 ? '0 m (inside)' : `${data.water_distance_m} m`;
-    const fDist = data.forest_distance_m === 0 ? '0 m (inside)' : `${data.forest_distance_m} m`;
+    const waterDistance = data.distance_to_water ?? data.water_distance_m ?? null;
+    const forestDistance = data.distance_to_forest ?? data.forest_distance_m ?? null;
+    const wDist = formatDistance(waterDistance);
+    const fDist = formatDistance(forestDistance);
 
     // ── Location sub-heading ──────────────────────────────────────
-    const locationName = data.location_name || data.resolved_name || 'Unknown Location';
+    const locationName = cleanLocationName(data.location_name || data.resolved_name || 'Unknown Location');
     const locLabel = locationName !== 'Unknown Location'
         ? locationName
         : `${data.lat?.toFixed(4)}, ${data.lon?.toFixed(4)}`;
@@ -306,12 +331,14 @@ function renderResults(data) {
     const purposeRec = data.purpose_recommendation || '';
     const purposeIcon = purposeIcons[data.purpose] || '🏷️';
     const hasPurpose = !!data.purpose;
-    const finalRecommendation = purposeRec || data.recommendation || '';
+    const finalRecommendation = purposeRec || data.recommendation || 'No recommendation available.';
 
     // ── Structured explanation from backend ───────────────────────
-    const triggeredFactors = data.triggered_factors || [];
+    const triggeredFactors = (data.triggered_factors || []).length > 0
+        ? data.triggered_factors
+        : ['No water or forest zones detected within threshold distance'];
     const explanationReasons = data.explanation_reasons || [];
-    const detailedExplanation = data.detailed_explanation || '';
+    const detailedExplanation = data.detailed_explanation || 'No explanation available.';
 
     resultsPanel.innerHTML = `
       <div class="report-card" style="
@@ -331,7 +358,7 @@ function renderResults(data) {
             <span style="font-size:1.4rem;">${icons[risk]}</span>
             <div>
               <div class="report-label">Location</div>
-              <div class="report-sub">${locLabel}</div>
+              <div class="report-sub">${escapeHtml(locLabel)}</div>
             </div>
           </div>
         </div>
@@ -344,7 +371,7 @@ function renderResults(data) {
             <div>
               <div class="report-label">Risk Level</div>
               <div class="report-value" style="color:${col.text}; font-size:1.3rem; font-weight:800; letter-spacing:0.04em;">
-                ${risk}
+                ${escapeHtml(risk)}
               </div>
             </div>
           </div>
@@ -355,10 +382,10 @@ function renderResults(data) {
         ${hasPurpose ? `
         <!-- ② Purpose Recommendation -->
         <div class="report-section purpose-result">
-          <div class="report-label">Purpose: ${purposeIcon} ${purposeLabel}</div>
+          <div class="report-label">Purpose: ${purposeIcon} ${escapeHtml(purposeLabel)}</div>
           <div class="purpose-rec-card purpose-rec-${risk.toLowerCase()}">
             <span class="purpose-rec-icon">${risk === 'HIGH' ? '⛔' : risk === 'MEDIUM' ? '⚠️' : '✅'}</span>
-            <span class="purpose-rec-text">${purposeRec}</span>
+            <span class="purpose-rec-text">${escapeHtml(purposeRec)}</span>
           </div>
         </div>
 
@@ -369,7 +396,7 @@ function renderResults(data) {
         <div class="report-section">
           <div class="report-label">Triggered Factors</div>
           <ul class="report-list" style="border-left:2px solid ${col.border};">
-            ${triggeredFactors.map(t => `<li>${t}</li>`).join('')}
+            ${triggeredFactors.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
           </ul>
         </div>
 
@@ -379,14 +406,14 @@ function renderResults(data) {
         <div class="report-section">
           <div class="report-label">Detailed Explanation</div>
           <div class="explanation-block explanation-${risk.toLowerCase()}">
-            <div class="explanation-text">${detailedExplanation}</div>
+            <div class="explanation-text">${escapeHtml(detailedExplanation)}</div>
           </div>
           ${explanationReasons.length > 0 ? `
           <div class="explanation-reasons">
             ${explanationReasons.map(r => `
               <div class="explanation-reason-item">
                 <span class="explanation-reason-bullet">›</span>
-                <span>${r}</span>
+                <span>${escapeHtml(r)}</span>
               </div>
             `).join('')}
           </div>
@@ -397,20 +424,20 @@ function renderResults(data) {
 
         <!-- ⑤ Distance -->
         <div class="report-section">
-          <div class="report-label">Distance</div>
+          <div class="report-label">Distances</div>
           <div class="report-dist-grid">
             <div class="dist-item">
               <span class="dist-icon">💧</span>
-              <span class="dist-label">Water</span>
+              <span class="dist-label">Water Distance</span>
               <span class="dist-val" style="color:${data.water_risk === 'HIGH' ? 'hsl(0,84%,65%)' : data.water_risk === 'MEDIUM' ? 'hsl(38,92%,55%)' : 'var(--text-secondary)'};">
-                ${wDist}
+                ${escapeHtml(wDist)}
               </span>
             </div>
             <div class="dist-item">
               <span class="dist-icon">🌲</span>
-              <span class="dist-label">Forest</span>
+              <span class="dist-label">Forest Distance</span>
               <span class="dist-val" style="color:${data.forest_risk === 'HIGH' ? 'hsl(0,84%,65%)' : data.forest_risk === 'MEDIUM' ? 'hsl(38,92%,55%)' : 'var(--text-secondary)'};">
-                ${fDist}
+                ${escapeHtml(fDist)}
               </span>
             </div>
           </div>
@@ -421,11 +448,11 @@ function renderResults(data) {
         <!-- ⑥ Recommendation -->
         <div class="report-section">
           <div class="report-label">Recommendation</div>
-          <div class="report-rec" style="color:${col.text};">${finalRecommendation}</div>
+          <div class="report-rec" style="color:${col.text};">${escapeHtml(finalRecommendation)}</div>
         </div>
 
         <!-- ⑦ Legal -->
-        <div class="report-legal">⚖️ Legal: ${data.legal_risk}</div>
+        <div class="report-legal">⚖️ Legal: ${escapeHtml(data.legal_risk || 'Not available')}</div>
 
       </div>
     `;
