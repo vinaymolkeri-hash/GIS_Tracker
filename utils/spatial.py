@@ -33,6 +33,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Load & project layers ONCE at startup ───────────────────────────────────
 BUFFER_M = 100  # MEDIUM risk threshold in meters
+SAFE_FALLBACK_MESSAGE = "No restricted zones detected within available dataset coverage"
 
 
 def _load_and_project(path: str, label: str):
@@ -180,10 +181,18 @@ def analyze_risk(lat: float, lon: float) -> dict:
 
     # Human-readable flags
     flags = []
-    if water_risk  == "HIGH":   flags.append(f"Inside water body — {water_reason.split('—')[-1].strip()}")
-    elif water_risk == "MEDIUM": flags.append(f"Near water body — {water_dist}m")
-    if forest_risk == "HIGH":   flags.append(f"Inside forest zone — {forest_reason.split('—')[-1].strip()}")
-    elif forest_risk == "MEDIUM": flags.append(f"Near forest zone — {forest_dist}m")
+    if water_risk == "HIGH":
+        flags.append("Inside water body")
+    elif water_risk == "MEDIUM":
+        flags.append(f"Near water body ({water_dist} m)")
+
+    if forest_risk == "HIGH":
+        flags.append("Inside forest zone")
+    elif forest_risk == "MEDIUM":
+        flags.append(f"Near forest zone ({forest_dist} m)")
+
+    if not flags:
+        flags.append("No water or forest zones detected within threshold distance")
 
     legal_risk = {
         "HIGH":   "Not suitable for construction",
@@ -202,12 +211,17 @@ def analyze_risk(lat: float, lon: float) -> dict:
     return {
         "risk":             overall,
         "water_risk":       water_risk,
+        "inside_water":     water_risk == "HIGH",
         "water_reason":     water_reason,
         "water_distance_m": water_dist,
+        "distance_to_water": water_dist,
         "forest_risk":      forest_risk,
+        "inside_forest":    forest_risk == "HIGH",
         "forest_reason":    forest_reason,
         "forest_distance_m": forest_dist,
+        "distance_to_forest": forest_dist,
         "flags":            flags,
+        "coverage_message": SAFE_FALLBACK_MESSAGE,
         "legal_risk":       legal_risk,
         "recommendation":   recommendation,
     }
