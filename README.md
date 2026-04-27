@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge\&logo=python\&logoColor=white)
 ![GeoPandas](https://img.shields.io/badge/GeoPandas-Spatial_Engine-139C5A?style=for-the-badge)
 ![Folium](https://img.shields.io/badge/Folium-Map_Overlays-77B829?style=for-the-badge)
 ![KGIS](https://img.shields.io/badge/KGIS-KSRSAC_Integration-1A5276?style=for-the-badge)
@@ -23,9 +23,9 @@
 
 Verifying whether a land parcel in Karnataka is legally safe — free from water body encroachments, forest violations, or government acquisition — currently requires:
 
-- Manual access to **multiple siloed portals** (Bhoomi, KGIS, Forest Dept., Revenue Dept.)
-- **Expert GIS knowledge** to cross-reference spatial layers
-- **2–5 hours per parcel** of manual analysis
+* Manual access to **multiple siloed portals** (Bhoomi, KGIS, Forest Dept., Revenue Dept.)
+* **Expert GIS knowledge** to cross-reference spatial layers
+* **2–5 hours per parcel** of manual analysis
 
 There is no single accessible tool that automates this for citizens, buyers, developers, or officials.
 
@@ -35,68 +35,70 @@ There is no single accessible tool that automates this for citizens, buyers, dev
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🔗 **Automatic KGIS Layer Retrieval** | Fetches spatial layers from KSRSAC's KGIS REST/WMS services |
-| 📍 **Flexible Input** | Accepts Karnataka survey numbers OR latitude/longitude coordinates |
-| 🔄 **Reverse Geocoding** | Automatically converts coordinates to human-readable location names |
-| 🌊 **Water Body Validation** | Checks against notified lakes, tanks, rivers and their buffer zones |
-| 🌳 **Forest & ESZ Check** | Validates against reserved forests and eco-sensitive zone boundaries |
-| 🏛️ **Govt. Land Restriction Check** | Cross-references revenue department acquired and restricted lands |
+| Feature                                | Description                                                                                           |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 🔗 **Automatic KGIS Layer Retrieval**  | Fetches spatial layers from KSRSAC's KGIS REST/WMS services                                           |
+| 📍 **Flexible Input**                  | Accepts Karnataka survey numbers OR latitude/longitude coordinates                                    |
+| 🔄 **Reverse Geocoding**               | Automatically converts coordinates to human-readable location names                                   |
+| 🌊 **Water Body Validation**           | Checks against notified lakes, tanks, rivers and their buffer zones                                   |
+| 🌳 **Forest & ESZ Check**              | Validates against reserved forests and eco-sensitive zone boundaries                                  |
+| 🏛️ **Govt. Land Restriction Check**   | Cross-references revenue department acquired and restricted lands                                     |
 | 🛡️ **Rule-Based Risk Classification** | Classifies each parcel as **Low / Medium / High** using deterministic spatial rules — no black-box ML |
-| 📄 **Safety Report Generation** | Auto-generates structured reports with legal flags and plain-language summaries |
-| 🗺️ **Visual Map Overlays** | Interactive Folium/Leaflet maps showing restriction zone overlaps |
-| 💬 **Explainability Engine** | Every result shows triggered factor, distance, reason, and recommendation |
-| 🏠 **Purpose-Based Recommendations** | Advice tailored to use case: residential / farming / commercial |
+| 📄 **Safety Report Generation**        | Auto-generates structured reports with legal flags and plain-language summaries                       |
+| 🗺️ **Visual Map Overlays**            | Interactive Folium/Leaflet maps showing restriction zone overlaps                                     |
+| 💬 **Explainability Engine**           | Every result shows triggered factor, distance, reason, and recommendation                             |
+| 🏠 **Purpose-Based Recommendations**   | Advice tailored to use case: residential / farming / commercial                                       |
 
 ---
 
 ## 🎯 How It Works
 
+```
 ┌──────────────────────────────────────────────────────┐
 │                    USER INPUT                        │
 │        Survey Number  OR  Geo-coordinates            │
 └───────────────────────┬──────────────────────────────┘
-│
-▼
+                        │
+                        ▼
 ┌──────────────────────────────────────────────────────┐
 │           GEOCODING / REVERSE GEOCODING              │
 │      Coordinates → Human-readable location name      │
 └───────────────────────┬──────────────────────────────┘
-│
-▼
+                        │
+                        ▼
 ┌──────────────────────────────────────────────────────┐
 │               KGIS LAYER RETRIEVAL                   │
 │  Water Bodies · Forest · Govt. Land · Boundaries     │
 │           (via KSRSAC REST/WMS APIs)                 │
 └───────────────────────┬──────────────────────────────┘
-│
-▼
+                        │
+                        ▼
 ┌──────────────────────────────────────────────────────┐
 │             SPATIAL VALIDATION ENGINE                │
 │   Point-in-Polygon · Buffer Zone · Intersection      │
 └───────────────────────┬──────────────────────────────┘
-│
-▼
+                        │
+                        ▼
 ┌──────────────────────────────────────────────────────┐
 │               FEATURE EXTRACTION                     │
 │  inside_water (bool) · inside_forest (bool)          │
 │  distance_to_water (m) · distance_to_forest (m)      │
 └───────────────────────┬──────────────────────────────┘
-│
-▼
+                        │
+                        ▼
 ┌──────────────────────────────────────────────────────┐
 │         RULE-BASED GEOSPATIAL RISK ENGINE            │
 │   Deterministic rules → Low / Medium / High          │
 │    No black-box ML — fully transparent logic         │
 └───────────────────────┬──────────────────────────────┘
-│
-▼
+                        │
+                        ▼
 ┌──────────────────────────────────────────────────────┐
 │               SAFETY REPORT OUTPUT                   │
 │  Risk Level · Legal Flags · Explanation              │
 │  Recommendation · Map Overlay · PDF Report           │
 └──────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -142,7 +144,10 @@ Land Records:  https://landrecords.karnataka.gov.in/service3/
 
 ---
 
+
 ## 🏗️ Architecture
+
+```
 gis_tracker/
 │
 ├── app.py                    # Main application entry point (Flask/FastAPI)
@@ -156,7 +161,7 @@ gis_tracker/
 │   ├── feature_extractor.py  # Extracts inside_water, distance_to_forest, etc.
 │   ├── risk_engine.py        # Deterministic rule-based risk classification
 │   ├── explainability.py     # Reason generation & purpose-based recommendations
-│   └── report_generator.py  # PDF/HTML Safety Report generation
+│   └── report_generator.py   # PDF/HTML Safety Report generation
 │
 ├── layers/                   # Cached GIS layer data (GeoJSON)
 │   ├── water_bodies/
@@ -172,8 +177,9 @@ gis_tracker/
 │   └── js/
 │
 └── tests/                    # Unit and integration tests
-├── test_spatial.py
-└── test_risk_engine.py
+    ├── test_spatial.py
+    └── test_risk_engine.py
+```
 
 ---
 
@@ -309,6 +315,7 @@ Content-Type: application/json
 
 ## 📊 Sample Safety Report
 
+```
 ╔══════════════════════════════════════════════════════════╗
 ║           GIS TRACKER — SAFETY REPORT                   ║
 ╠══════════════════════════════════════════════════════════╣
@@ -328,44 +335,32 @@ Content-Type: application/json
 ║  Recommendation: Obtain KLDA clearance before any        ║
 ║                  construction activity.                  ║
 ╚══════════════════════════════════════════════════════════╝
+```
 
 ---
 
 ## 🧪 Validation & Testing
 
-All core scenarios tested and verified:
-
-| Scenario | Expected | Result |
-|----------|----------|--------|
-| Inside water body | HIGH | ✅ Correct |
-| On boundary overlap | HIGH | ✅ Correct |
-| Near buffer zone (< 100m) | MEDIUM | ✅ Correct |
-| Outside all zones | LOW | ✅ Correct |
-
-```bash
-# Run all tests
-pytest tests/
-
-# Run spatial validation tests
-pytest tests/test_spatial.py -v
-
-# Run with coverage report
-pytest tests/ --cov=core --cov-report=html
-```
+| Scenario                  | Expected | Result    |
+| ------------------------- | -------- | --------- |
+| Inside water body         | HIGH     | ✅ Correct |
+| On boundary overlap       | HIGH     | ✅ Correct |
+| Near buffer zone (< 100m) | MEDIUM   | ✅ Correct |
+| Outside all zones         | LOW      | ✅ Correct |
 
 ---
 
 ## 📈 Performance
 
-| Metric | Value |
-|--------|-------|
-| Spatial Validation (coordinate input) | **~3–5 ms** |
-| Full Report Generation | < 10 seconds |
-| Layer Retrieval Success Rate | > 95% |
-| Spatial Validation Accuracy | > 92% (vs. manual expert review) |
-| High Risk Classification Precision | ~89% |
-| Test Scenarios Passed | 4 / 4 |
-| Supported Area | All 31 districts of Karnataka |
+| Metric                                | Value                            |
+| ------------------------------------- | -------------------------------- |
+| Spatial Validation (coordinate input) | **~3–5 ms**                      |
+| Full Report Generation                | < 10 seconds                     |
+| Layer Retrieval Success Rate          | > 95%                            |
+| Spatial Validation Accuracy           | > 92% (vs. manual expert review) |
+| High Risk Classification Precision    | ~89%                             |
+| Test Scenarios Passed                 | 4 / 4                            |
+| Supported Area                        | All 31 districts of Karnataka    |
 
 ---
 
@@ -397,18 +392,6 @@ pytest tests/ --cov=core --cov-report=html
 
 ---
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature-name`
-3. Commit your changes: `git commit -m "Add: your feature description"`
-4. Push to the branch: `git push origin feature/your-feature-name`
-5. Open a Pull Request
-
-Please ensure all tests pass before submitting a PR.
-
----
-
 ## 📜 License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
@@ -425,10 +408,10 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ## 👥 Team
 
-| Name | Roll Number |
-|------|-------------|
-| **Unnam Karthikeya** | 23BCS131 |
-| **Vinay Molkeri** | 23BCS133 |
+| Name             | Roll Number |
+| ---------------- | ----------- |
+| Unnam Karthikeya | 23BCS131    |
+| Vinay Molkeri    | 23BCS133    |
 
 ---
 
